@@ -1,0 +1,147 @@
+---
+title: "Machine Learning Assignment"
+author: "David Meow"
+date: "Sunday, October 25, 2015"
+output: html_document
+---
+
+#Summary
+
+This assignment is an investigation into the Human Activity Recognition (HAR) project, as explained in http://groupware.les.inf.puc-rio.br/har). As claimed, HAR has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community.
+
+In this paper, we study one HAR research done on six young health participants. They were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions:
+Class A - exactly according to the specification 
+Class B - throwing the elbows to the front
+Class C - lifting the dumbbell only halfway
+Class D - lowering the dumbbell only halfway, and
+Class E - throwing the hips to the front.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. We made sure that all participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).
+
+
+#Objectives
+
+The objective of this project is to predict the manner in which the subjects did the exercise.
+
+I am to also create a report describing how I built my model, how I used cross validation, what I think the expected out of sample error is, and why I made the choices I did. 
+
+I will also use my prediction model to predict 20 different test cases. 
+
+
+
+###Step 1: Obtaining Data
+
+The data for this project can be obtained from the following sources:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The first step in obtaining data:
+
+```{r,echo=FALSE}
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <-read.csv(url(trainUrl),na.strings=c("NA","#DIV/0!",""))
+TESTING <-read.csv(url(testUrl),na.strings=c("NA","#DIV/0!",""))
+dim(training)
+```
+
+
+### Step 2: Cleaning Data
+
+From earlier use of a spreadsheet, the data frame has 19622 rows (observations) and 160 columns (variables). Most of the variables correspond to sensor readings for one of the four sensors:
+
+   _belt   _arm     _dumbell   _forearm
+
+
+The first seven columns are not relevant and thus should be removed. 
+
+```{r}
+delete <- grep(patter = "_belt|_arm|_dumbell|_forearm",names(training))
+length(delete)
+data = training[,c(delete,160)]
+dim(data)
+```
+
+After this, the remaing columns include too many variables whose values are NA for all observations and thus are irrelevant and need to be removed.
+
+```{r}
+
+missingNA=is.na(data)
+omit = which(colSums(missingNA)>19000)
+data=data[,-omit]
+dim(data)
+```
+
+We are now down to 40 variables. 
+
+```{r}
+table(complete.cases(data))
+table(sapply(data[1,],class))
+```
+
+Now, all remaining predictor variables are numeric save for the "classe" variable.
+
+
+
+###Step 3: Partioning the training data into two
+
+The common practice is to split the testing data (with 75% of the casses to training set). The loading of relevant packages would be now executed
+
+```{r}
+library(caret)
+set.seed(1234)
+inTrain <- createDataPartition(y=data$classe,p=0.75,list=FALSE)
+training<-data[inTrain,]
+testing <-data[-inTrain,]
+
+```
+
+
+### Step 4: Using Random Forest
+
+As the datasets pertain to non-parametric data, I decided to use Random Forest to fit the predictor to the training set.
+
+```{r}
+library(randomForest)
+(randForest=randomForest(classe~.,data=training,ntree=500))
+```
+
+The Confusion Matrix reveals low out-of-bag (OOB) error estimate and gave the impression that the predictor is reasonably accurate.
+
+### Step 5: Applying the Predictor Model to Testing Subsample
+
+Using the prediction above, the subsample testing data is employed.
+
+```{r}
+predTest = predict(randForest,newdata=testing)
+```
+
+### Step 7: Out of sample error and Cross-validation
+
+The error estimate will be determined using the confusionMatrix function of the caret package:
+
+```{r}
+confusionMatrix(predTest,testing$classe)
+```
+
+Both the accuracy and the Cohen's kappa indicator of concordance indicate taht the predictor seems to have a low out of sample error rate.
+
+### Step 6: Alternate test using Rattle
+
+In an alternate approach, using the Rattle package, I fitted the predictor variables as follow:
+
+```{r}
+library(rattle)
+modFit<-train(classe~.,method="rpart",data=training)
+fancyRpartPlot(modFit$finalModel)
+```
+
+
+From the illustration, it is quite clear that the Class A exerise is distinguishable from the other classes in terms of ther correct manner of proper exercises.
+
+
+
+### References
+
+1.  http://groupware.les.inf.puc-rio.br/har
+
